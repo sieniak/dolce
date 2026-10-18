@@ -104,6 +104,31 @@ h2{font-size:17px;font-weight:600;margin:0 0 8px}
 .scen th:first-child,.scen td:first-child{text-align:left}
 .scen th{font-weight:500;color:var(--muted);font-size:13px}
 .scen td.num{font-size:17px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 0 6px;border:0;background:none;font-size:11px;font-weight:500;color:var(--muted);cursor:pointer}
+.tabs button span{font-size:21px;line-height:1.1;filter:grayscale(1);opacity:.6}
+.tabs button[aria-current="page"]{color:var(--accent)}
+.tabs button[aria-current="page"] span{filter:none;opacity:1}
+#alDot{position:absolute;top:5px;left:calc(50% + 9px);width:9px;height:9px;border-radius:50%;background:var(--down)}
+main{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+.tt{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:34px;font-weight:700;margin:4px 0 12px}
+.btn{width:100%;margin-top:12px;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+@media (prefers-color-scheme:dark){.btn{color:#0D1A1C}}
+.btn2{display:inline-block;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:14px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.simin select{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 6px;width:100%;min-width:0}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scen td.l,.scen th.l{text-align:left}
+.corr{border-collapse:collapse;width:100%;font-size:14px}
+.corr th,.corr td{padding:8px 6px;text-align:center}
+.corr th{color:var(--muted);font-weight:500}
+.banner{background:var(--surface);border:2px solid var(--up);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.x{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13px;padding:4px 9px;flex:0 0 auto}
+h3.sub{font-size:15px;margin:18px 0 4px}
+.best{font-weight:700;color:var(--accent)}
+.ev b{flex-basis:46px!important;color:var(--accent)}
+.ev span{flex:1}
+.pfsum{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .msg{background:var(--surface);border:1px solid var(--down);border-radius:12px;padding:12px;margin-top:16px}
 .msg button{margin-top:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 12px;cursor:pointer}
 .loading{opacity:.5;transition:opacity .2s}
@@ -130,6 +155,8 @@ footer a{color:inherit}
 </head>
 <body>
 <main>
+  <div id="alertBanner"></div>
+  <div data-tab="analiza">
   <div class="quick" id="quick" role="group" aria-label="Szybki wybór waluty"></div>
 
   <div class="hero" id="hero">
@@ -169,6 +196,7 @@ footer a{color:inherit}
       <div class="panel">
         <div class="verdict"><div class="gauge num" id="gauge">0</div><div><h3 id="vTitle">–</h3><p id="vSub"></p></div></div>
         <ul class="factors" id="factors"></ul>
+        <p class="warn" id="evWarn" hidden></p>
       </div>
       <h2 style="margin-top:18px">Test strategii na historii</h2>
       <div class="panel">
@@ -176,6 +204,9 @@ footer a{color:inherit}
         <label class="spread">Koszt wymiany (spread kantoru) <input id="spread" type="number" min="0" max="10" step="0.01" inputmode="decimal"> % <button id="useWt" hidden>Wstaw spread z Walutomatu</button></label>
         <dl class="bt" id="bt"></dl>
         <ol class="trades" id="trades"></ol>
+        <h3 class="sub">Porównanie strategii</h3>
+        <div class="tblwrap"><table class="scen" id="strat"></table></div>
+        <p class="note" id="stratNote"></p>
         <p class="warn">Sygnały opierają się wyłącznie na przeszłych kursach i nie gwarantują zysku. Kurs NBP to kurs średni, a w kantorze kupujesz drożej i sprzedajesz taniej. To narzędzie pomocnicze, nie porada inwestycyjna.</p>
       </div>
     </section>
@@ -188,6 +219,7 @@ footer a{color:inherit}
           <label>Data zakupu <input id="simDate" type="date"></label>
         </div>
         <div class="res" id="simHist"></div>
+        <div class="res" id="simDca"></div>
         <div class="res" id="simFut"></div>
         <p class="warn">Symulacja uwzględnia spread ustawiony w teście strategii (połowa przy zakupie, połowa przy sprzedaży). Przeszłe wyniki nie gwarantują przyszłych.</p>
       </div>
@@ -208,8 +240,92 @@ footer a{color:inherit}
     </section>
   </div>
 
+  <div data-tab="portfel" hidden>
+    <h1 class="tt">Mój portfel</h1>
+    <div class="panel" id="pfSummary"></div>
+    <section>
+      <h2>Dodaj transakcję</h2>
+      <div class="panel">
+        <div class="simin">
+          <label>Rodzaj <select id="txType"><option value="buy">Kupno waluty</option><option value="sell">Sprzedaż waluty</option></select></label>
+          <label>Waluta <select id="txCode"></select></label>
+          <label>Data <input id="txDate" type="date"></label>
+          <label>Ilość waluty <input id="txQty" type="number" step="0.01" min="0" inputmode="decimal"></label>
+          <label>Kurs (zł za 1) <input id="txRate" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+          <label>Kantor <input id="txWhere" type="text" placeholder="np. Walutomat"></label>
+        </div>
+        <p class="note" id="txPreview"></p>
+        <button class="btn" id="txAdd">Dodaj transakcję</button>
+      </div>
+    </section>
+    <section>
+      <h2>Historia transakcji</h2>
+      <div class="panel">
+        <div class="tblwrap"><table class="scen" id="txList"></table></div>
+        <div class="btns">
+          <button class="btn2" id="txExport">Eksportuj CSV</button>
+          <label class="btn2">Importuj CSV<input type="file" id="txImport" accept=".csv,text/csv" hidden></label>
+        </div>
+        <p class="note">Wynik liczony jest metodą średniego kursu zakupu. Wartość dziś to kurs NBP pomniejszony o połowę spreadu, czyli przybliżona kwota, którą dostałbyś przy sprzedaży. Dane są zapisane tylko w tym telefonie, więc co jakiś czas rób eksport CSV jako kopię zapasową. Zysk ze sprzedaży waluty może podlegać opodatkowaniu, w razie wątpliwości sprawdź to z księgowym.</p>
+      </div>
+    </section>
+  </div>
+
+  <div data-tab="rynek" hidden>
+    <h1 class="tt">Rynek</h1>
+    <p class="note" style="margin:-6px 0 10px">Okres taki jak w zakładce Analiza.</p>
+    <h2>EUR/USD</h2>
+    <div class="panel">
+      <div class="chart"><canvas id="mktChart" aria-label="Wykres EUR/USD"></canvas></div>
+      <p class="note" id="mktNote"></p>
+    </div>
+    <section>
+      <h2>Korelacje dziennych zmian wobec złotego</h2>
+      <div class="panel">
+        <div class="tblwrap"><table class="corr" id="corr"></table></div>
+        <p class="note">1,00 oznacza, że dwie waluty zmieniają się identycznie wobec złotego, a 0, że niezależnie. Gdy wszystkie waluty są mocno skorelowane, ruch wynika głównie z siły lub słabości złotego, a nie z konkretnej waluty.</p>
+      </div>
+    </section>
+    <section>
+      <h2>Kalendarz wydarzeń</h2>
+      <div class="panel">
+        <ul class="factors ev" id="evList" style="margin-top:0;border-top:0"></ul>
+        <div class="simin" style="margin-top:12px">
+          <label>Data <input id="evDate" type="date"></label>
+          <label>Wydarzenie <input id="evName" type="text" placeholder="np. inflacja GUS"></label>
+        </div>
+        <button class="btn2" id="evAdd" style="margin-top:10px">Dodaj wydarzenie</button>
+        <p class="note">Terminy RPP, EBC i Fed wpisałem według opublikowanych harmonogramów. Mogą się zmienić, więc przed ważną decyzją sprawdź je na stronach NBP, EBC i Fed.</p>
+      </div>
+    </section>
+  </div>
+
+  <div data-tab="alerty" hidden>
+    <h1 class="tt">Alerty cenowe</h1>
+    <div class="panel">
+      <div class="simin">
+        <label>Waluta <select id="alCode"></select></label>
+        <label>Warunek <select id="alDir"><option value="below">Spadnie poniżej</option><option value="above">Wzrośnie powyżej</option></select></label>
+        <label>Kurs (zł) <input id="alPrice" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+        <label>Źródło <select id="alSrc"><option value="wt">Walutomat (na żywo)</option><option value="nbp">NBP (raz dziennie)</option></select></label>
+      </div>
+      <button class="btn" id="alAdd">Dodaj alert</button>
+    </div>
+    <section>
+      <h2>Twoje alerty</h2>
+      <div class="panel"><ul class="factors" id="alList" style="margin-top:0;border-top:0"></ul></div>
+      <p class="note">Alerty są sprawdzane, gdy aplikacja jest otwarta: przy uruchomieniu i co 5 minut. „Spadnie poniżej” porównuje cenę kupna, a „wzrośnie powyżej” cenę sprzedaży w Walutomacie. iPhone nie pozwala zwykłej stronie działać w tle, więc powiadomienia przy zamkniętej aplikacji wymagałyby osobnego serwera.</p>
+    </section>
+  </div>
+
   <footer>Dane: średnie kursy NBP (tabela A), aktualizowane w dni robocze około 12:00. Analiza ma charakter informacyjny i nie jest rekomendacją inwestycyjną.</footer>
 </main>
+<nav class="tabs" id="tabs" aria-label="Sekcje">
+  <button data-t="analiza"><span>📈</span>Analiza</button>
+  <button data-t="portfel"><span>💼</span>Portfel</button>
+  <button data-t="rynek"><span>🌍</span>Rynek</button>
+  <button data-t="alerty"><span>🔔</span>Alerty<i id="alDot" hidden></i></button>
+</nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
@@ -234,14 +350,14 @@ footer a{color:inherit}
     sma20: prefs.sma20 ?? true,
     sma50: prefs.sma50 ?? true,
     spread: prefs.spread ?? 0.5,
-    amount: prefs.amount ?? 10000, last: null,
+    amount: prefs.amount ?? 10000, last: null, tab: prefs.tab || 'analiza',
     table: null, prev: null, names: {}
   };
   const cache = new Map();
   const charts = {};
 
   function load(){ try { return JSON.parse(localStorage.getItem('kursy-prefs')); } catch { return null; } }
-  function save(){ try { localStorage.setItem('kursy-prefs', JSON.stringify({code:state.code,days:state.days,cmp:state.cmp,sma20:state.sma20,sma50:state.sma50,spread:state.spread,amount:state.amount})); } catch {} }
+  function save(){ try { localStorage.setItem('kursy-prefs', JSON.stringify({code:state.code,days:state.days,cmp:state.cmp,sma20:state.sma20,sma50:state.sma50,spread:state.spread,amount:state.amount,tab:state.tab})); } catch {} }
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const digits = v => v < 0.1 ? 6 : 4;
@@ -422,7 +538,8 @@ footer a{color:inherit}
     $('signal').textContent = parts.join(' ');
 
     state.last = {code: state.code, series, v, i0, d, cash: renderSignals(series, v, i0, s20, s50, r14, d, cx)};
-    renderSim();
+    renderSim(); renderStrategies(); renderEvWarn();
+    if (state.tab === 'portfel') renderPortfolio();
     await renderCompare(view, vals, labels);
     $('content').classList.remove('loading');
   }
@@ -576,6 +693,7 @@ footer a{color:inherit}
       <p>Jeśli kupisz <b>dziś</b> za ${zl(amt)} po ${fmt(ask, d)} ${live ? '(Walutomat na żywo)' : '(kurs NBP + spread)'}, dostaniesz <b>${fmt(q2, 2)} ${code}</b>.</p>
       <p>Wyjdziesz na zero dopiero, gdy kurs sprzedaży wzrośnie do <b>${fmt(be, d)}</b>, czyli o ${pct((be/bidNow - 1)*100)}.</p>
       <table class="scen"><thead><tr><th>Zmiana kursu</th><th>Sprzedaż po</th><th>Zysk / strata</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderDca();
   }
 
   function showError(err){
@@ -599,6 +717,7 @@ footer a{color:inherit}
     try {
       await loadTables();
       renderSelects(); renderQuick(); renderHero(); syncRange(); renderLive();
+      fillTabSelects(); showTab(state.tab, true); checkAlerts();
       await renderAnalysis();
     } catch (e) { showError(e); }
   }
@@ -619,9 +738,275 @@ footer a{color:inherit}
   $('tSma20').checked = state.sma20; $('tSma50').checked = state.sma50;
   $('tSma20').onchange = e => { state.sma20 = e.target.checked; save(); renderAnalysis().catch(showError); };
   $('tSma50').onchange = e => { state.sma50 = e.target.checked; save(); renderAnalysis().catch(showError); };
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.table && renderAnalysis().catch(showError));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!state.table) return; renderAnalysis().catch(showError); if (state.tab === 'rynek') renderMarket().catch(showError); });
   let loadedAt = Date.now();
   document.addEventListener('visibilitychange', () => { if (!document.hidden && state.table && Date.now() - loadedAt > 30*60*1000) { loadedAt = Date.now(); cache.clear(); start(); } });
+
+  // ================= Wspólne narzędzia =================
+  const LS = (k, def) => { try { const x = JSON.parse(localStorage.getItem(k)); return x ?? def; } catch { return def; } };
+  const SS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const num = x => parseFloat(String(x).replace(/\s/g, '').replace(',', '.'));
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const clsOf = x => x > 0 ? 'up' : x < 0 ? 'down' : '';
+  let txs = LS('kursy-tx', []), alerts = LS('kursy-alerts', []), userEv = LS('kursy-events', []);
+
+  // ================= Zakładki =================
+  function showTab(t, keepScroll){
+    state.tab = t; save();
+    document.querySelectorAll('[data-tab]').forEach(el => el.hidden = el.dataset.tab !== t);
+    document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.t === t ? 'page' : 'false'));
+    if (!keepScroll) window.scrollTo(0, 0);
+    if (t === 'portfel') renderPortfolio();
+    if (t === 'rynek') renderMarket().catch(showError);
+    if (t === 'alerty') renderAlerts();
+  }
+  $('tabs').onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.t); };
+
+  function fillTabSelects(){
+    const opts = state.table.rates.map(r => `<option value="${r.code}">${r.code} (${r.currency})</option>`).join('');
+    ['txCode', 'alCode'].forEach(id => { const el = $(id), v = el.value; el.innerHTML = opts; el.value = v || state.code; });
+    if (!$('txDate').value) $('txDate').value = today();
+    if (!$('evDate').value) $('evDate').value = today();
+    updateTxHints(); updateAlHints();
+  }
+  const midOf = code => (state.table.rates.find(r => r.code === code) || {}).mid;
+
+  // ================= Porównanie strategii =================
+  function runBT(v, from, sig, sp){
+    let cash = 1, qty = 0, inPos = false, entry = 0, peak = 1, mdd = 0, trades = 0, wins = 0;
+    for (let i = from; i < v.length; i++){
+      const s = i > 0 ? sig(i) : null;
+      if (!inPos && s === 'buy'){ qty = cash / (v[i] * (1 + sp/2)); entry = cash; cash = 0; inPos = true; }
+      else if (inPos && s === 'sell'){ cash = qty * v[i] * (1 - sp/2); trades++; if (cash > entry) wins++; qty = 0; inPos = false; }
+      const eq = inPos ? qty * v[i] * (1 - sp/2) : cash;
+      if (eq > peak) peak = eq;
+      mdd = Math.max(mdd, (peak - eq) / peak);
+    }
+    return {mult: inPos ? qty * v[v.length-1] * (1 - sp/2) : cash, trades, wins, mdd};
+  }
+
+  function renderStrategies(){
+    const L0 = state.last; if (!L0) return;
+    const {v, i0} = L0, sp = state.spread / 100, L = v.length - 1;
+    const s20 = sma(v, 20), s50 = sma(v, 50), r = rsi(v), {h} = macd(v), bb = bollinger(v);
+    const ok = (...a) => a.every(x => x != null);
+    const S = [
+      ['Przecięcie średnich 20/50', i => !ok(s20[i-1], s50[i-1]) ? null : s20[i-1] <= s50[i-1] && s20[i] > s50[i] ? 'buy' : s20[i-1] >= s50[i-1] && s20[i] < s50[i] ? 'sell' : null],
+      ['RSI: odbicie od 30, wyjście poniżej 70', i => !ok(r[i-1], r[i]) ? null : r[i-1] < 30 && r[i] >= 30 ? 'buy' : r[i-1] > 70 && r[i] <= 70 ? 'sell' : null],
+      ['Bollinger: kup pod wstęgą, sprzedaj przy średniej', i => !bb[i] ? null : v[i] < bb[i].lo ? 'buy' : v[i] >= s20[i] ? 'sell' : null],
+      ['MACD: przecięcie linii sygnału', i => i < 35 ? null : h[i-1] <= 0 && h[i] > 0 ? 'buy' : h[i-1] >= 0 && h[i] < 0 ? 'sell' : null]
+    ];
+    const split = i0 + Math.floor((L - i0) * 0.6);
+    const rows = S.map(([n, f]) => [n, runBT(v, i0, f, sp), runBT(v, split, f, sp)]);
+    const hold = from => runBT(v, from, i => i === from ? 'buy' : null, sp);
+    rows.push(['Kup i trzymaj', hold(i0), hold(split)]);
+    const best = rows.reduce((a, b) => b[1].mult > a[1].mult ? b : a);
+    const bestLate = rows.reduce((a, b) => b[2].mult > a[2].mult ? b : a);
+    const pr = x => pct((x - 1) * 100);
+    $('strat').innerHTML = `<thead><tr><th class="l">Strategia</th><th>Cały okres</th><th>Ostatnie 40%</th><th>Transakcje</th><th>Max spadek</th></tr></thead><tbody>` +
+      rows.map(([n, a, b]) => `<tr><td class="l ${n === best[0] ? 'best' : ''}">${n}</td><td class="num ${clsOf(a.mult - 1)}">${pr(a.mult)}</td><td class="num ${clsOf(b.mult - 1)}">${pr(b.mult)}</td><td class="num">${a.trades}${a.trades ? ` (${Math.round(a.wins / a.trades * 100)}% zysk.)` : ''}</td><td class="num">${fmt(-a.mdd * 100, 1)}%</td></tr>`).join('') + '</tbody>';
+    $('stratNote').textContent = `Najlepsza w całym okresie: ${best[0]}. ` +
+      (best[0] === bestLate[0] ? 'Wygrywa też w ostatnich 40% okresu, więc wynik jest bardziej wiarygodny.' : `W ostatnich 40% okresu lepiej wypadła strategia „${bestLate[0]}”, więc przewaga mogła być przypadkowa.`) +
+      ' „Max spadek” pokazuje, ile w najgorszym momencie traciłbyś od szczytu.';
+  }
+
+  // ================= Zakupy rozłożone w czasie =================
+  function renderDca(){
+    const L0 = state.last; if (!L0 || L0.code !== state.code) return;
+    const {series, v, d} = L0, code = state.code, amt = state.amount, sp = state.spread / 100, L = v.length - 1;
+    let b = series.findIndex(p => p.date >= $('simDate').value); if (b < 0) b = L;
+    const idx = []; let lastM = '';
+    for (let i = b; i <= L; i++){ const m = series[i].date.slice(0, 7); if (m !== lastM){ idx.push(i); lastM = m; } }
+    if (idx.length < 2){ $('simDca').innerHTML = '<p class="note" style="margin:0">Ustaw datę zakupu co najmniej miesiąc wstecz, żeby porównać zakupy rozłożone w czasie.</p>'; return; }
+    const part = amt / idx.length; let q = 0;
+    idx.forEach(i => q += part / (v[i] * (1 + sp/2)));
+    const sell = v[L] * (1 - sp/2), val = q * sell, lump = amt / (v[b] * (1 + sp/2)) * sell;
+    $('simDca').innerHTML = `<p><b>Zakupy rozłożone w czasie.</b> Gdybyś tę samą kwotę podzielił na ${idx.length} zakupów co miesiąc po ${zl(part)}, miałbyś ${fmt(q, 2)} ${code} po średnim kursie ${fmt(amt / q, d)}.</p>
+      <p>Wartość dziś: <b class="${clsOf(val - amt)}">${zl(val)}</b> (${zlSigned(val - amt)}), a przy jednym zakupie ${zl(lump)}. ${val > lump ? 'Rozłożenie zakupów wyszło lepiej.' : val < lump ? 'Tym razem lepszy był jeden zakup.' : ''}</p>`;
+  }
+
+  // ================= Rynek =================
+  async function renderMarket(){
+    if (!state.table) return;
+    renderEvents();
+    const days = state.days, codes = [...new Set(['EUR', 'USD', 'CHF', 'GBP', state.code])];
+    const all = await Promise.all(codes.map(c => loadSeries(c, days)));
+    const maps = all.map(s => new Map(s.map(p => [p.date, p.mid])));
+    const st = new Date(); st.setDate(st.getDate() - days); const k0 = iso(st);
+    const dates = all[0].map(p => p.date).filter(dt => dt >= k0 && maps.every(m => m.has(dt)));
+    if (dates.length < 3) return;
+    const eu = dates.map(dt => maps[0].get(dt) / maps[1].get(dt));
+    const o = baseOpts(); o.plugins.tooltip.callbacks = {label: c => `EUR/USD: ${fmt(c.parsed.y, 4)}`};
+    draw('mktChart', {type: 'line', data: {labels: dates.map(plDate), datasets: [ds('EUR/USD', eu, css('--accent'), 2)]}, options: o});
+    const f = dates[0], l = dates[dates.length - 1];
+    const ch = m => (m.get(l) / m.get(f) - 1) * 100;
+    const cEU = (eu[eu.length - 1] / eu[0] - 1) * 100, cE = ch(maps[0]), cU = ch(maps[1]);
+    let txt = `W tym okresie EUR/USD zmienił się o ${pct(cEU)}: ${cEU > 0 ? 'euro umocniło się wobec dolara' : 'dolar umocnił się wobec euro'}. Wobec złotego euro zmieniło się o ${pct(cE)}, a dolar o ${pct(cU)}.`;
+    if (Math.sign(cE) === Math.sign(cU) && Math.abs(cE) > 1 && Math.abs(cU) > 1) txt += ` Obie waluty poszły w tę samą stronę, więc główną przyczyną była ${cE > 0 ? 'słabość' : 'siła'} złotego.`;
+    $('mktNote').textContent = txt;
+    const rets = maps.map(m => dates.slice(1).map((dt, i) => Math.log(m.get(dt) / m.get(dates[i]))));
+    const corr = (a, b) => { const n = a.length, ma = a.reduce((x, y) => x + y, 0) / n, mb = b.reduce((x, y) => x + y, 0) / n;
+      let sab = 0, sa = 0, sb = 0; for (let i = 0; i < n; i++){ sab += (a[i]-ma)*(b[i]-mb); sa += (a[i]-ma)**2; sb += (b[i]-mb)**2; } return sab / Math.sqrt(sa * sb); };
+    $('corr').innerHTML = `<tr><th></th>${codes.map(c => `<th>${c}</th>`).join('')}</tr>` + codes.map((c, i) => `<tr><th>${c}</th>${codes.map((_, j) => {
+      const r = i === j ? 1 : corr(rets[i], rets[j]);
+      return `<td class="num" style="background:color-mix(in srgb, var(--accent) ${Math.round(Math.abs(r) * 55)}%, transparent)">${fmt(r, 2)}</td>`; }).join('')}</tr>`).join('');
+  }
+
+  // ================= Kalendarz =================
+  const EVENTS = [
+    {d: '2026-10-28', n: 'Fed: decyzja w sprawie stóp (USD)'},
+    {d: '2026-10-29', n: 'EBC: decyzja w sprawie stóp (EUR)'},
+    {d: '2026-11-04', n: 'RPP: decyzja w sprawie stóp (PLN)'},
+    {d: '2026-12-02', n: 'RPP: decyzja w sprawie stóp (PLN)'},
+    {d: '2026-12-09', n: 'Fed: decyzja w sprawie stóp (USD)'},
+    {d: '2026-12-17', n: 'EBC: decyzja w sprawie stóp (EUR)'}
+  ];
+  const allEvents = () => [...EVENTS.map(e => ({...e, fixed: true})), ...userEv].sort((a, b) => a.d < b.d ? -1 : 1);
+  const daysTo = d => Math.round((new Date(d + 'T12:00:00') - new Date(today() + 'T12:00:00')) / 864e5);
+  function renderEvents(){
+    const list = allEvents().filter(e => daysTo(e.d) >= 0);
+    $('evList').innerHTML = list.length ? list.map(e => `<li><b class="num">${daysTo(e.d) === 0 ? 'dziś' : daysTo(e.d) + ' d'}</b><span>${plDate(e.d)}: ${esc(e.n)}</span>${e.fixed ? '' : `<button class="x" data-del="${e.id}" aria-label="Usuń wydarzenie">✕</button>`}</li>`).join('')
+      : '<li><span>Brak nadchodzących wydarzeń. Dodaj własne poniżej.</span></li>';
+  }
+  function renderEvWarn(){
+    const soon = allEvents().filter(e => { const k = daysTo(e.d); return k >= 0 && k <= 3; });
+    $('evWarn').hidden = !soon.length;
+    $('evWarn').textContent = soon.length ? `Wkrótce: ${soon.map(e => `${plDate(e.d)}, ${e.n}`).join('; ')}. Wokół takich wydarzeń kurs bywa bardzo zmienny, a sygnały techniczne są mniej wiarygodne.` : '';
+  }
+  $('evAdd').onclick = () => {
+    const d = $('evDate').value, n = $('evName').value.trim(); if (!d || !n) return;
+    userEv.push({id: uid(), d, n}); SS('kursy-events', userEv); $('evName').value = ''; renderEvents(); renderEvWarn();
+  };
+  $('evList').onclick = e => { const b = e.target.closest('[data-del]'); if (!b) return;
+    userEv = userEv.filter(x => x.id !== b.dataset.del); SS('kursy-events', userEv); renderEvents(); renderEvWarn(); };
+
+  // ================= Portfel =================
+  function pfCalc(){
+    const pf = {};
+    [...txs].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).forEach(t => {
+      const p = pf[t.code] || (pf[t.code] = {qty: 0, cost: 0, real: 0});
+      if (t.type === 'buy'){ p.qty += t.qty; p.cost += t.qty * t.rate; }
+      else {
+        const avg = p.qty > 0 ? p.cost / p.qty : t.rate;
+        p.real += t.qty * (t.rate - avg); p.cost -= t.qty * avg; p.qty -= t.qty;
+        if (p.qty < 1e-9){ p.qty = 0; p.cost = 0; }
+      }
+    });
+    return pf;
+  }
+  function renderPortfolio(){
+    if (!state.table) return;
+    const pf = pfCalc(), sp = state.spread / 100;
+    let tv = 0, tu = 0, tr = 0;
+    const rows = Object.entries(pf).map(([c, p]) => {
+      const mid = midOf(c) || 0, val = p.qty * mid * (1 - sp/2), un = val - p.cost;
+      tv += val; tu += un; tr += p.real;
+      return `<tr><td class="l"><b>${c}</b></td><td class="num">${fmt(p.qty, 2)}</td><td class="num">${p.qty ? fmt(p.cost / p.qty, 4) : '–'}</td><td class="num">${fmt(mid, 4)}</td><td class="num ${clsOf(un)}">${p.qty ? zlSigned(un) : '–'}</td></tr>`;
+    });
+    $('pfSummary').innerHTML = !txs.length ? '<p class="note" style="margin:0">Dodaj pierwszą transakcję poniżej, a tutaj zobaczysz, ile masz każdej waluty i jaki jest Twój wynik.</p>' :
+      `<div class="pfsum"><div><div class="note" style="margin:0">Wartość walut dziś</div><div class="big num">${zl(tv)}</div></div>
+       <div><div class="note" style="margin:0">Wynik niezrealizowany</div><div class="num ${clsOf(tu)}" style="font-size:24px;font-weight:700">${zlSigned(tu)}</div>
+       <div class="note" style="margin:0">Zrealizowany: <b class="${clsOf(tr)}">${zlSigned(tr)}</b></div></div></div>
+       <div class="tblwrap"><table class="scen"><thead><tr><th class="l">Waluta</th><th>Ilość</th><th>Śr. kurs zakupu</th><th>Kurs NBP</th><th>Wynik</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    const list = [...txs].sort((a, b) => a.date < b.date ? 1 : -1);
+    $('txList').innerHTML = list.length ? `<thead><tr><th class="l">Data</th><th class="l">Rodzaj</th><th>Ilość</th><th>Kurs</th><th>Zmiana</th><th></th></tr></thead><tbody>` +
+      list.map(t => { const mid = midOf(t.code), ch = mid ? (mid / t.rate - 1) * 100 * (t.type === 'buy' ? 1 : -1) : null;
+        return `<tr><td class="l">${plDate(t.date)}</td><td class="l">${t.type === 'buy' ? 'Kupno' : 'Sprzedaż'} ${t.code}${t.where ? `<br><small class="note">${esc(t.where)}</small>` : ''}</td><td class="num">${fmt(t.qty, 2)}</td><td class="num">${fmt(t.rate, 4)}</td><td class="num ${clsOf(ch)}">${ch == null ? '–' : pct(ch)}</td><td><button class="x" data-del="${t.id}" aria-label="Usuń transakcję">✕</button></td></tr>`; }).join('') + '</tbody>'
+      : '<tbody><tr><td class="l note">Brak transakcji.</td></tr></tbody>';
+  }
+  function updateTxHints(){
+    const m = state.table && midOf($('txCode').value);
+    $('txRate').placeholder = m ? fmt(m, 4) : '';
+    const q = num($('txQty').value), r = num($('txRate').value);
+    $('txPreview').textContent = q > 0 && r > 0 ? `${fmt(q, 2)} ${$('txCode').value} × ${fmt(r, 4)} = ${zl(q * r)}` : 'Wpisz ilość waluty i kurs z potwierdzenia transakcji w kantorze.';
+  }
+  ['txCode', 'txType', 'txQty', 'txRate'].forEach(id => $(id).addEventListener('input', updateTxHints));
+  $('txAdd').onclick = () => {
+    const q = num($('txQty').value), r = num($('txRate').value), d = $('txDate').value;
+    if (!(q > 0) || !(r > 0) || !d){ $('txPreview').textContent = 'Uzupełnij datę, ilość waluty i kurs.'; return; }
+    txs.push({id: uid(), type: $('txType').value, code: $('txCode').value, date: d, qty: q, rate: r, where: $('txWhere').value.trim()});
+    SS('kursy-tx', txs); $('txQty').value = ''; $('txRate').value = ''; updateTxHints(); renderPortfolio();
+  };
+  $('txList').onclick = e => { const b = e.target.closest('[data-del]'); if (!b) return;
+    if (!confirm('Usunąć tę transakcję?')) return;
+    txs = txs.filter(t => t.id !== b.dataset.del); SS('kursy-tx', txs); renderPortfolio(); };
+  $('txExport').onclick = () => {
+    const dec = x => String(x).replace('.', ',');
+    const lines = ['typ;waluta;data;ilosc;kurs;kantor', ...txs.map(t => [t.type === 'buy' ? 'kupno' : 'sprzedaz', t.code, t.date, dec(t.qty), dec(t.rate), (t.where || '').replace(/;/g, ',')].join(';'))];
+    const file = new File(['\ufeff' + lines.join('\r\n')], `transakcje-${today()}.csv`, {type: 'text/csv'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) navigator.share({files: [file], title: 'Transakcje walutowe'}).catch(() => {});
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); }
+  };
+  $('txImport').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rows = (await f.text()).replace(/^\ufeff/, '').split(/\r?\n/).map(l => l.split(';')).filter(r => r.length >= 5 && r[0] !== 'typ');
+    const key = t => [t.type, t.code, t.date, t.qty, t.rate].join('|'), have = new Set(txs.map(key));
+    let added = 0;
+    rows.forEach(r => { const t = {id: uid(), type: /^sprz/i.test(r[0]) ? 'sell' : 'buy', code: r[1].trim().toUpperCase(), date: r[2].trim(), qty: num(r[3]), rate: num(r[4]), where: (r[5] || '').trim()};
+      if (t.qty > 0 && t.rate > 0 && /^\d{4}-\d\d-\d\d$/.test(t.date) && !have.has(key(t))){ txs.push(t); have.add(key(t)); added++; } });
+    SS('kursy-tx', txs); e.target.value = ''; renderPortfolio();
+    alert(`Zaimportowano transakcji: ${added}.`);
+  };
+
+  // ================= Alerty =================
+  async function wtQuote(code){
+    if (!WT_CODES.includes(code)) return null;
+    try { const r = await fetch((WT_PROXY || WT_API) + code + 'PLN', {headers: {Accept: 'application/json'}});
+      if (!r.ok) return null; const j = await r.json();
+      return {ask: parseFloat(j.result.asks[0].price), bid: parseFloat(j.result.bids[0].price)};
+    } catch { return null; }
+  }
+  async function checkAlerts(){
+    if (!state.table) return;
+    const act = alerts.filter(a => a.active);
+    const codes = [...new Set(act.filter(a => a.src === 'wt').map(a => a.code))], q = {};
+    await Promise.all(codes.map(async c => q[c] = await wtQuote(c)));
+    act.forEach(a => {
+      let p;
+      if (a.src === 'wt'){ const x = q[a.code]; if (!x){ a.err = true; return; } p = a.dir === 'below' ? x.ask : x.bid; }
+      else p = midOf(a.code);
+      if (p == null) return;
+      a.err = false; a.lastP = p; a.lastAt = Date.now();
+      if ((a.dir === 'below' && p <= a.price) || (a.dir === 'above' && p >= a.price)){ a.active = false; a.hit = {p, at: Date.now()}; a.ack = false; }
+    });
+    SS('kursy-alerts', alerts); renderBanner(); if (state.tab === 'alerty') renderAlerts();
+  }
+  const when = t => new Date(t).toLocaleString('pl-PL', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+  function renderBanner(){
+    const hits = alerts.filter(a => a.hit && !a.ack);
+    $('alDot').hidden = !hits.length;
+    $('alertBanner').innerHTML = hits.map(a => `<div class="banner"><div><b>🔔 ${a.code} ${a.dir === 'below' ? 'spadł poniżej' : 'wzrósł powyżej'} ${fmt(a.price, 4)} zł</b><br>
+      Kurs ${a.src === 'wt' ? (a.dir === 'below' ? 'kupna w Walutomacie' : 'sprzedaży w Walutomacie') : 'NBP'}: ${fmt(a.hit.p, 4)} zł, ${when(a.hit.at)}</div><button class="x" data-ack="${a.id}">OK</button></div>`).join('');
+  }
+  $('alertBanner').onclick = e => { const b = e.target.closest('[data-ack]'); if (!b) return;
+    const a = alerts.find(x => x.id === b.dataset.ack); if (a) a.ack = true; SS('kursy-alerts', alerts); renderBanner(); };
+  function renderAlerts(){
+    $('alList').innerHTML = alerts.length ? alerts.map(a => `<li><b class="${a.active ? '' : 'up'}">${a.active ? '●' : '✓'}</b><span style="flex:1">${a.code} ${a.dir === 'below' ? 'poniżej' : 'powyżej'} ${fmt(a.price, 4)} zł, ${a.src === 'wt' ? 'Walutomat' : 'NBP'}<br>
+      <small class="note">${a.hit ? `Spełniony ${when(a.hit.at)} przy ${fmt(a.hit.p, 4)} zł` : a.err ? 'Brak połączenia z Walutomatem' : a.lastP ? `Ostatnio ${fmt(a.lastP, 4)} zł, ${when(a.lastAt)}` : 'Czeka na sprawdzenie'}</small></span>
+      ${a.active ? '' : `<button class="x" data-re="${a.id}">Włącz</button>`}<button class="x" data-del="${a.id}" aria-label="Usuń alert">✕</button></li>`).join('')
+      : '<li><span>Nie masz jeszcze alertów.</span></li>';
+  }
+  function updateAlHints(){
+    const c = $('alCode').value, m = state.table && midOf(c);
+    $('alPrice').placeholder = m ? fmt(m, 4) : '';
+    const noWt = !WT_CODES.includes(c); $('alSrc').options[0].disabled = noWt; if (noWt) $('alSrc').value = 'nbp';
+  }
+  $('alCode').addEventListener('input', updateAlHints);
+  $('alAdd').onclick = () => {
+    const p = num($('alPrice').value); if (!(p > 0)){ $('alPrice').focus(); return; }
+    alerts.push({id: uid(), code: $('alCode').value, dir: $('alDir').value, price: p, src: $('alSrc').value, active: true});
+    SS('kursy-alerts', alerts); $('alPrice').value = ''; renderAlerts(); checkAlerts();
+  };
+  $('alList').onclick = e => {
+    const d = e.target.closest('[data-del]'), r = e.target.closest('[data-re]');
+    if (!d && !r) return;
+    if (d) alerts = alerts.filter(a => a.id !== d.dataset.del);
+    if (r){ const a = alerts.find(x => x.id === r.dataset.re); if (a){ a.active = true; a.hit = null; a.ack = true; } }
+    SS('kursy-alerts', alerts); renderAlerts(); renderBanner(); if (r) checkAlerts();
+  };
+  setInterval(() => { if (!document.hidden) checkAlerts(); }, 5 * 60 * 1000);
 
   start();
 })();
