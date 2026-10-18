@@ -93,6 +93,17 @@ h2{font-size:17px;font-weight:600;margin:0 0 8px}
 .live a{color:var(--accent)}
 .live .muted{color:var(--muted);font-size:13px;margin-top:4px}
 .spread button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px}
+.simin{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.simin label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.simin input{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.big{font-size:34px;font-weight:700;line-height:1.1}
+.res{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.res p{margin:4px 0;font-size:14px}
+.scen{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+.scen th,.scen td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}
+.scen th:first-child,.scen td:first-child{text-align:left}
+.scen th{font-weight:500;color:var(--muted);font-size:13px}
+.scen td.num{font-size:17px}
 .msg{background:var(--surface);border:1px solid var(--down);border-radius:12px;padding:12px;margin-top:16px}
 .msg button{margin-top:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 12px;cursor:pointer}
 .loading{opacity:.5;transition:opacity .2s}
@@ -170,6 +181,19 @@ footer a{color:inherit}
     </section>
 
     <section>
+      <h2>Symulacja inwestycji</h2>
+      <div class="panel">
+        <div class="simin">
+          <label>Kwota w złotych <input id="simAmt" type="number" min="1" step="100" inputmode="decimal"></label>
+          <label>Data zakupu <input id="simDate" type="date"></label>
+        </div>
+        <div class="res" id="simHist"></div>
+        <div class="res" id="simFut"></div>
+        <p class="warn">Symulacja uwzględnia spread ustawiony w teście strategii (połowa przy zakupie, połowa przy sprzedaży). Przeszłe wyniki nie gwarantują przyszłych.</p>
+      </div>
+    </section>
+
+    <section>
       <h2>RSI (14 dni)</h2>
       <div class="panel"><div class="chart small"><canvas id="rsiChart" aria-label="Wykres RSI"></canvas></div></div>
       <p class="note">Powyżej 70 waluta jest uznawana za „wykupioną” (możliwa korekta w dół), poniżej 30 za „wyprzedaną”.</p>
@@ -197,7 +221,7 @@ footer a{color:inherit}
   const WT_PROXY = '';
   const WT_API = 'https://api.walutomat.pl/api/v2.0.0/market_fx/best_offers?currencyPair=';
   const WT_CODES = ['EUR','USD','GBP','CHF','CZK','DKK','NOK','SEK','HUF','CAD','AUD','JPY'];
-  let wtSpread = null, wtTimer = null;
+  let wtSpread = null, wtTimer = null, wtAsk = null, wtBid = null;
   const QUICK = ['EUR','USD','CHF','GBP','JPY','NOK','SEK','CZK'];
   const LOOKBACK = 80; // dodatkowe dni do policzenia średnich i RSI
   const $ = id => document.getElementById(id);
@@ -210,13 +234,14 @@ footer a{color:inherit}
     sma20: prefs.sma20 ?? true,
     sma50: prefs.sma50 ?? true,
     spread: prefs.spread ?? 0.5,
+    amount: prefs.amount ?? 10000, last: null,
     table: null, prev: null, names: {}
   };
   const cache = new Map();
   const charts = {};
 
   function load(){ try { return JSON.parse(localStorage.getItem('kursy-prefs')); } catch { return null; } }
-  function save(){ try { localStorage.setItem('kursy-prefs', JSON.stringify({code:state.code,days:state.days,cmp:state.cmp,sma20:state.sma20,sma50:state.sma50,spread:state.spread})); } catch {} }
+  function save(){ try { localStorage.setItem('kursy-prefs', JSON.stringify({code:state.code,days:state.days,cmp:state.cmp,sma20:state.sma20,sma50:state.sma50,spread:state.spread,amount:state.amount})); } catch {} }
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const digits = v => v < 0.1 ? 6 : 4;
@@ -396,7 +421,8 @@ footer a{color:inherit}
     if (a20 && a50) parts.push(a20 > a50 ? 'Średnia 20-dniowa jest nad 50-dniową.' : 'Średnia 20-dniowa jest pod 50-dniową.');
     $('signal').textContent = parts.join(' ');
 
-    renderSignals(series, v, i0, s20, s50, r14, d, cx);
+    state.last = {code: state.code, series, v, i0, d, cash: renderSignals(series, v, i0, s20, s50, r14, d, cx)};
+    renderSim();
     await renderCompare(view, vals, labels);
     $('content').classList.remove('loading');
   }
@@ -455,6 +481,7 @@ footer a{color:inherit}
     const rows = trades.slice(-5).reverse().map(t => `<li>Kupno ${plDate(series[t.a].date)} po ${fmt(v[t.a],d)}, sprzedaż ${plDate(series[t.b].date)} po ${fmt(v[t.b],d)}: <span class="${cls(t.g)}">${pr(t.g)}</span></li>`);
     if (open != null) rows.unshift(`<li>Otwarta pozycja od ${plDate(series[entry].date)} po ${fmt(v[entry],d)}: <span class="${cls(open)}">${pr(open)}</span> na dziś</li>`);
     $('trades').innerHTML = rows.length ? rows.join('') : '<li style="list-style:none;margin-left:-18px;color:var(--muted)">Brak sygnałów w tym okresie. Wybierz dłuższy okres, np. 2R.</li>';
+    return {mult: cash, firstBuy: cx.find(c => c.type === 'buy')};
   }
 
   async function renderCompare(view, vals, labels){
@@ -475,7 +502,7 @@ footer a{color:inherit}
 
   async function renderLive(){
     const box = $('live'); const code = state.code;
-    clearTimeout(wtTimer); wtSpread = null; $('useWt').hidden = true;
+    clearTimeout(wtTimer); wtSpread = null; wtAsk = wtBid = null; $('useWt').hidden = true;
     if (!WT_CODES.includes(code)){ box.hidden = true; return; }
     const link = `<a href="https://www.walutomat.pl/" target="_blank" rel="noopener">Otwórz Walutomat</a>`;
     try {
@@ -484,7 +511,7 @@ footer a{color:inherit}
       const j = await r.json(); if (!j.success || !j.result) throw new Error('brak danych');
       if (code !== state.code) return;
       const ask = parseFloat(j.result.asks[0].price), bid = parseFloat(j.result.bids[0].price);
-      const mid = (ask + bid) / 2; wtSpread = (ask - bid) / mid * 100;
+      wtAsk = ask; wtBid = bid; const mid = (ask + bid) / 2; wtSpread = (ask - bid) / mid * 100;
       const nbp = state.table.rates.find(x => x.code === code).mid;
       const d = digits(mid);
       box.innerHTML = `<div class="row">
@@ -494,12 +521,61 @@ footer a{color:inherit}
         <div class="muted">Walutomat na żywo, ${new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}. Środek rynku ${pct((mid/nbp-1)*100)} względem kursu NBP. ${link}</div>`;
       box.hidden = false; $('useWt').hidden = false;
       $('useWt').textContent = `Wstaw spread z Walutomatu (${fmt(wtSpread,2)}%)`;
+      renderSim();
     } catch (e) {
       console.warn('Walutomat:', e);
       box.innerHTML = `<div class="muted" style="margin:0">Nie udało się pobrać kursu z Walutomatu (przeglądarka mogła zablokować połączenie). ${link}</div>`;
       box.hidden = false;
     }
     if (!document.hidden) wtTimer = setTimeout(renderLive, 60000);
+  }
+
+  const zl = x => x.toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' zł';
+  const zlSigned = x => (x > 0 ? '+' : x < 0 ? '−' : '') + zl(Math.abs(x));
+
+  function renderSim(){
+    const L0 = state.last; if (!L0 || L0.code !== state.code) return;
+    const {series, v, i0, d, cash} = L0, code = state.code;
+    const amt = state.amount, sp = state.spread / 100, L = v.length - 1;
+    const di = $('simDate');
+    di.min = series[0].date; di.max = series[L].date;
+    if (!di.value || di.value < di.min || di.value > di.max) di.value = series[i0].date;
+    let b = series.findIndex(p => p.date >= di.value); if (b < 0) b = L;
+
+    // 1. Historia: kupno w wybranym dniu, sprzedaż dziś
+    const buy = v[b] * (1 + sp/2), sell = v[L] * (1 - sp/2);
+    const qty = amt / buy, now = qty * sell, pl = now - amt, plp = (now/amt - 1) * 100;
+    const days = Math.round((new Date(series[L].date) - new Date(series[b].date)) / 864e5);
+    const yearly = days > 30 ? (Math.pow(now/amt, 365/days) - 1) * 100 : null;
+    const cls = x => x > 0 ? 'up' : x < 0 ? 'down' : '';
+    // strategia sygnałów od tej samej daty
+    let stratTxt = '';
+    if (cash && b === i0) {
+      const sv = amt * cash.mult;
+      stratTxt = `<p>Gdybyś zamiast tego kupował i sprzedawał według sygnałów średnich, miałbyś <b class="${cls(sv-amt)}">${zl(sv)}</b> (${zlSigned(sv-amt)}).</p>`;
+    } else if (cash) {
+      stratTxt = `<p class="note" style="margin-top:6px">Porównanie ze strategią sygnałów jest liczone od początku wybranego okresu. Ustaw datę ${plDate(series[i0].date)}, żeby je zobaczyć.</p>`;
+    }
+    $('simHist').innerHTML = `
+      <p>Gdybyś ${plDate(series[b].date)} wymienił <b>${zl(amt)}</b> po ${fmt(buy, d)}, miałbyś <b>${fmt(qty, 2)} ${code}</b>.</p>
+      <p>Po sprzedaży dziś po ${fmt(sell, d)} otrzymałbyś:</p>
+      <div class="big num ${cls(pl)}">${zl(now)}</div>
+      <p><b class="${cls(pl)}">${zlSigned(pl)} (${pct(plp)})</b> w ${days} dni${yearly != null ? `, czyli ${pct(yearly)} w skali roku` : ''}.</p>
+      ${stratTxt}`;
+
+    // 2. Scenariusze: kupno dziś
+    const live = wtAsk != null;
+    const ask = live ? wtAsk : v[L] * (1 + sp/2);
+    const bidNow = live ? wtBid : v[L] * (1 - sp/2);
+    const q2 = amt / ask, be = ask;
+    const rows = [-5, -2, -1, 0, 1, 2, 5].map(ch => {
+      const sellAt = bidNow * (1 + ch/100), val = q2 * sellAt, r = val - amt;
+      return `<tr><td>${ch > 0 ? '+' : ''}${ch}%</td><td class="num">${fmt(sellAt, d)}</td><td class="num ${cls(r)}">${zlSigned(r)}</td></tr>`;
+    }).join('');
+    $('simFut').innerHTML = `
+      <p>Jeśli kupisz <b>dziś</b> za ${zl(amt)} po ${fmt(ask, d)} ${live ? '(Walutomat na żywo)' : '(kurs NBP + spread)'}, dostaniesz <b>${fmt(q2, 2)} ${code}</b>.</p>
+      <p>Wyjdziesz na zero dopiero, gdy kurs sprzedaży wzrośnie do <b>${fmt(be, d)}</b>, czyli o ${pct((be/bidNow - 1)*100)}.</p>
+      <table class="scen"><thead><tr><th>Zmiana kursu</th><th>Sprzedaż po</th><th>Zysk / strata</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   function showError(err){
@@ -537,6 +613,9 @@ footer a{color:inherit}
   $('spread').value = state.spread;
   $('spread').onchange = e => { const x = parseFloat(String(e.target.value).replace(',', '.')); state.spread = isNaN(x) ? 0 : Math.min(Math.max(x,0),10); e.target.value = state.spread; save(); renderAnalysis().catch(showError); };
   $('useWt').onclick = e => { e.preventDefault(); if (wtSpread == null) return; $('spread').value = Math.round(wtSpread*100)/100; $('spread').onchange({target:$('spread')}); };
+  $('simAmt').value = state.amount;
+  $('simAmt').oninput = e => { const x = parseFloat(String(e.target.value).replace(',', '.')); if (x > 0) { state.amount = x; save(); renderSim(); } };
+  $('simDate').onchange = () => renderSim();
   $('tSma20').checked = state.sma20; $('tSma50').checked = state.sma50;
   $('tSma20').onchange = e => { state.sma20 = e.target.checked; save(); renderAnalysis().catch(showError); };
   $('tSma50').onchange = e => { state.sma50 = e.target.checked; save(); renderAnalysis().catch(showError); };
