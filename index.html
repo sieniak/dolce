@@ -123,6 +123,7 @@ main{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
 .corr th,.corr td{padding:8px 6px;text-align:center}
 .corr th{color:var(--muted);font-weight:500}
 .banner{background:var(--surface);border:2px solid var(--up);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.factors li .x{align-self:center}
 .x{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13px;padding:4px 9px;flex:0 0 auto}
 h3.sub{font-size:15px;margin:18px 0 4px}
 .best{font-weight:700;color:var(--accent)}
@@ -238,6 +239,7 @@ footer a{color:inherit}
       </div>
       <div class="panel"><div class="chart"><canvas id="cmpChart" aria-label="Wykres porównania"></canvas></div></div>
     </section>
+  </div>
   </div>
 
   <div data-tab="portfel" hidden>
@@ -843,7 +845,7 @@ footer a{color:inherit}
     const f = dates[0], l = dates[dates.length - 1];
     const ch = m => (m.get(l) / m.get(f) - 1) * 100;
     const cEU = (eu[eu.length - 1] / eu[0] - 1) * 100, cE = ch(maps[0]), cU = ch(maps[1]);
-    let txt = `W tym okresie EUR/USD zmienił się o ${pct(cEU)}: ${cEU > 0 ? 'euro umocniło się wobec dolara' : 'dolar umocnił się wobec euro'}. Wobec złotego euro zmieniło się o ${pct(cE)}, a dolar o ${pct(cU)}.`;
+    let txt = `W tym okresie EUR/USD zmienił się o ${pct(cEU)}: ${Math.abs(cEU) < 0.05 ? 'para praktycznie stoi w miejscu' : cEU > 0 ? 'euro umocniło się wobec dolara' : 'dolar umocnił się wobec euro'}. Wobec złotego euro zmieniło się o ${pct(cE)}, a dolar o ${pct(cU)}.`;
     if (Math.sign(cE) === Math.sign(cU) && Math.abs(cE) > 1 && Math.abs(cU) > 1) txt += ` Obie waluty poszły w tę samą stronę, więc główną przyczyną była ${cE > 0 ? 'słabość' : 'siła'} złotego.`;
     $('mktNote').textContent = txt;
     const rets = maps.map(m => dates.slice(1).map((dt, i) => Math.log(m.get(dt) / m.get(dates[i]))));
