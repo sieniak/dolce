@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kursy">
+<meta name="theme-color" content="#EDF1F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1A1C" media="(prefers-color-scheme: dark)">
+<title>Kursy walut – analiza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap&subset=latin-ext" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#EDF1F0;--surface:#FFFFFF;--ink:#0F2A2E;--muted:#5B7174;--line:#D5DEDC;
+  --accent:#1E5F74;--up:#1F8A5B;--down:#C0392B;--sma1:#C98A12;--sma2:#8E5BB5;--cmp:#E07A2F;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    color-scheme:dark;
+    --bg:#0D1A1C;--surface:#152629;--ink:#E2ECEA;--muted:#8FA5A7;--line:#24393C;
+    --accent:#5FB3C9;--up:#4CC38A;--down:#F0776B;--sma1:#E8B84A;--sma2:#B590DA;--cmp:#F29A5C;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font:400 15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+main{max-width:760px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left,0px)) 32px max(16px,env(safe-area-inset-right,0px))}
+.num{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-variant-numeric:tabular-nums}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Quick picks */
+.quick{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin:0 -16px 12px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;display:flex;gap:8px;align-items:baseline;cursor:pointer}
+.chip b{font-weight:600}
+.chip span{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:17px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] span{color:inherit;opacity:.75}
+
+/* Hero */
+.hero{padding:8px 0 4px}
+.pair{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pair select{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:100%}
+.pair .name{color:var(--muted)}
+.rate{font-size:clamp(64px,22vw,120px);font-weight:700;line-height:.95;letter-spacing:-.01em;margin:6px 0 2px}
+.rate small{font-size:.32em;font-weight:500;color:var(--muted);margin-left:.15em;letter-spacing:0}
+.delta{font-weight:600}
+.up{color:var(--up)}.down{color:var(--down)}
+.date{color:var(--muted);font-size:13px}
+
+/* Range */
+.range{display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;margin:18px 0 10px}
+.range button{border:0;background:none;padding:7px 0;border-radius:7px;cursor:pointer;font-weight:500}
+.range button[aria-pressed="true"]{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.range button[aria-pressed="true"]{color:#0D1A1C}}
+
+section{margin-top:22px}
+h2{font-size:17px;font-weight:600;margin:0 0 8px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.chart{position:relative;height:260px}
+.chart.small{height:130px}
+.toggles{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:14px}
+.toggles label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stat{background:var(--surface);padding:10px 12px}
+.stat dt{font-size:13px;color:var(--muted)}
+.stat dd{margin:0;font-size:24px;font-weight:700}
+.stat dd small{display:block;font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:12px;font-weight:400;color:var(--muted)}
+.note{font-size:14px;color:var(--muted);margin:10px 0 0}
+
+.cmp-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.cmp-head select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+
+.live{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.live .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.live .q{font-size:26px;font-weight:700}
+.live .lbl{color:var(--muted);font-size:13px}
+.live a{color:var(--accent)}
+.live .muted{color:var(--muted);font-size:13px;margin-top:4px}
+.spread button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px}
+.msg{background:var(--surface);border:1px solid var(--down);border-radius:12px;padding:12px;margin-top:16px}
+.msg button{margin-top:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 12px;cursor:pointer}
+.loading{opacity:.5;transition:opacity .2s}
+
+.verdict{display:flex;align-items:center;gap:14px}
+.gauge{flex:0 0 auto;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:700;border:4px solid var(--line)}
+.gauge.up{border-color:var(--up)}.gauge.down{border-color:var(--down)}
+.verdict h3{margin:0;font-size:22px;line-height:1.2}
+.verdict p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.factors{list-style:none;padding:0;margin:12px 0 0;border-top:1px solid var(--line)}
+.factors li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.factors li b{flex:0 0 26px;text-align:center}
+.bt{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.bt div{background:var(--bg);border-radius:10px;padding:10px}
+.bt dt{font-size:13px;color:var(--muted)}.bt dd{margin:0;font-size:24px;font-weight:700}
+.spread{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:12px;flex-wrap:wrap}
+.spread input{width:70px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.trades{font-size:14px;margin:10px 0 0;padding-left:18px}
+.warn{font-size:13px;color:var(--muted);border-left:3px solid var(--sma1);padding:6px 10px;margin-top:12px}
+footer{margin-top:28px;font-size:12px;color:var(--muted)}
+footer a{color:inherit}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <div class="quick" id="quick" role="group" aria-label="Szybki wybór waluty"></div>
+
+  <div class="hero" id="hero">
+    <div class="pair">
+      <label for="cur" class="name">Waluta</label>
+      <select id="cur" aria-label="Wybierz walutę"></select>
+    </div>
+    <div class="rate num" id="rate">–</div>
+    <div><span class="delta" id="delta"></span> <span class="date" id="date"></span></div>
+    <div class="live" id="live" hidden></div>
+  </div>
+
+  <div class="range" id="range" role="group" aria-label="Okres">
+    <button data-d="31">1M</button><button data-d="92">3M</button><button data-d="183">6M</button>
+    <button data-d="366">1R</button><button data-d="731">2R</button><button data-d="1827">5R</button>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="content">
+    <div class="panel">
+      <div class="chart"><canvas id="priceChart" aria-label="Wykres kursu"></canvas></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="tSma20"> <span class="sw" style="background:var(--sma1)"></span> Średnia 20 dni</label>
+        <label><input type="checkbox" id="tSma50"> <span class="sw" style="background:var(--sma2)"></span> Średnia 50 dni</label>
+      </div>
+    </div>
+
+    <section>
+      <h2>Statystyki okresu</h2>
+      <dl class="stats" id="stats"></dl>
+      <p class="note" id="signal"></p>
+    </section>
+
+    <section>
+      <h2>Kiedy kupić, kiedy sprzedać</h2>
+      <div class="panel">
+        <div class="verdict"><div class="gauge num" id="gauge">0</div><div><h3 id="vTitle">–</h3><p id="vSub"></p></div></div>
+        <ul class="factors" id="factors"></ul>
+      </div>
+      <h2 style="margin-top:18px">Test strategii na historii</h2>
+      <div class="panel">
+        <p class="note" style="margin:0">Strategia: kup walutę, gdy średnia 20-dniowa przetnie 50-dniową od dołu (▲ na wykresie), sprzedaj, gdy przetnie ją od góry (▼). Wynik dla wybranego okresu, najlepiej sprawdzać na 1R–5R.</p>
+        <label class="spread">Koszt wymiany (spread kantoru) <input id="spread" type="number" min="0" max="10" step="0.01" inputmode="decimal"> % <button id="useWt" hidden>Wstaw spread z Walutomatu</button></label>
+        <dl class="bt" id="bt"></dl>
+        <ol class="trades" id="trades"></ol>
+        <p class="warn">Sygnały opierają się wyłącznie na przeszłych kursach i nie gwarantują zysku. Kurs NBP to kurs średni, a w kantorze kupujesz drożej i sprzedajesz taniej. To narzędzie pomocnicze, nie porada inwestycyjna.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>RSI (14 dni)</h2>
+      <div class="panel"><div class="chart small"><canvas id="rsiChart" aria-label="Wykres RSI"></canvas></div></div>
+      <p class="note">Powyżej 70 waluta jest uznawana za „wykupioną” (możliwa korekta w dół), poniżej 30 za „wyprzedaną”.</p>
+    </section>
+
+    <section>
+      <div class="cmp-head">
+        <h2 style="margin:0">Porównanie zmian (%)</h2>
+        <select id="cmp" aria-label="Waluta do porównania"></select>
+      </div>
+      <div class="panel"><div class="chart"><canvas id="cmpChart" aria-label="Wykres porównania"></canvas></div></div>
+    </section>
+  </div>
+
+  <footer>Dane: średnie kursy NBP (tabela A), aktualizowane w dni robocze około 12:00. Analiza ma charakter informacyjny i nie jest rekomendacją inwestycyjną.</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(() => {
+  const API = 'https://api.nbp.pl/api/exchangerates';
+  // Kursy na żywo z Walutomatu (najlepsze oferty kupna i sprzedaży na giełdzie walut).
+  // Jeśli Safari zablokuje bezpośrednie połączenie, wpisz tu adres swojego proxy, np.
+  // 'https://kursy-proxy.twoj-login.workers.dev/?pair=' (instrukcja w pliku worker.js).
+  const WT_PROXY = '';
+  const WT_API = 'https://api.walutomat.pl/api/v2.0.0/market_fx/best_offers?currencyPair=';
+  const WT_CODES = ['EUR','USD','GBP','CHF','CZK','DKK','NOK','SEK','HUF','CAD','AUD','JPY'];
+  let wtSpread = null, wtTimer = null;
+  const QUICK = ['EUR','USD','CHF','GBP','JPY','NOK','SEK','CZK'];
+  const LOOKBACK = 80; // dodatkowe dni do policzenia średnich i RSI
+  const $ = id => document.getElementById(id);
+
+  const prefs = load() || {};
+  const state = {
+    code: prefs.code || 'EUR',
+    days: prefs.days || 183,
+    cmp: prefs.cmp ?? 'USD',
+    sma20: prefs.sma20 ?? true,
+    sma50: prefs.sma50 ?? true,
+    spread: prefs.spread ?? 0.5,
+    table: null, prev: null, names: {}
+  };
+  const cache = new Map();
+  const charts = {};
+
+  function load(){ try { return JSON.parse(localStorage.getItem('kursy-prefs')); } catch { return null; } }
+  function save(){ try { localStorage.setItem('kursy-prefs', JSON.stringify({code:state.code,days:state.days,cmp:state.cmp,sma20:state.sma20,sma50:state.sma50,spread:state.spread})); } catch {} }
+
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const digits = v => v < 0.1 ? 6 : 4;
+  const fmt = (v, d) => v == null || isNaN(v) ? '–' : v.toLocaleString('pl-PL', {minimumFractionDigits:d, maximumFractionDigits:d});
+  const pct = v => (v > 0 ? '+' : '') + fmt(v, 2) + '%';
+  const iso = d => d.toISOString().slice(0,10);
+  const plDate = s => new Date(s + 'T12:00:00').toLocaleDateString('pl-PL', {day:'numeric', month:'short', year:'numeric'});
+
+  async function getJSON(url){
+    const r = await fetch(url, {headers:{Accept:'application/json'}});
+    if (r.status === 404) return null; // brak notowań w tym przedziale
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  async function loadTables(){
+    const t = await getJSON(`${API}/tables/a/last/2/?format=json`);
+    state.prev = t[0]; state.table = t[1];
+    state.table.rates.forEach(r => state.names[r.code] = r.currency);
+  }
+
+  // NBP zwraca maks. 93 dni na zapytanie, więc dzielimy okres na kawałki
+  async function loadSeries(code, days){
+    const key = code + ':' + days;
+    if (cache.has(key)) return cache.get(key);
+    const end = new Date(), start = new Date();
+    start.setDate(start.getDate() - days - LOOKBACK);
+    const jobs = [];
+    for (let s = new Date(start); s <= end; ){
+      const e = new Date(s); e.setDate(e.getDate() + 89);
+      const ee = e > end ? end : e;
+      jobs.push(getJSON(`${API}/rates/a/${code}/${iso(s)}/${iso(ee)}/?format=json`));
+      s = new Date(ee); s.setDate(s.getDate() + 1);
+    }
+    const parts = await Promise.all(jobs);
+    const map = new Map();
+    parts.forEach(p => p && p.rates.forEach(r => map.set(r.effectiveDate, r.mid)));
+    const series = [...map.entries()].sort((a,b) => a[0] < b[0] ? -1 : 1).map(([date, mid]) => ({date, mid}));
+    cache.set(key, series);
+    return series;
+  }
+
+  function sma(v, n){ const out = Array(v.length).fill(null); let s = 0;
+    for (let i = 0; i < v.length; i++){ s += v[i]; if (i >= n) s -= v[i-n]; if (i >= n-1) out[i] = s / n; } return out; }
+
+  function rsi(v, n = 14){
+    const out = Array(v.length).fill(null); if (v.length <= n) return out;
+    let g = 0, l = 0;
+    for (let i = 1; i <= n; i++){ const d = v[i]-v[i-1]; if (d > 0) g += d; else l -= d; }
+    g /= n; l /= n; out[n] = l === 0 ? 100 : 100 - 100/(1 + g/l);
+    for (let i = n+1; i < v.length; i++){
+      const d = v[i]-v[i-1];
+      g = (g*(n-1) + Math.max(d,0))/n; l = (l*(n-1) + Math.max(-d,0))/n;
+      out[i] = l === 0 ? 100 : 100 - 100/(1 + g/l);
+    }
+    return out;
+  }
+
+  function ema(v, n){ const k = 2/(n+1); let e = v[0]; return v.map((x,i) => (e = i ? x*k + e*(1-k) : x)); }
+  function macd(v){ const a = ema(v,12), b = ema(v,26); const m = v.map((_,i) => a[i]-b[i]); const sg = ema(m,9); return {m, sg, h: m.map((x,i) => x - sg[i])}; }
+  function bollinger(v, n = 20, k = 2){
+    const mid = sma(v, n);
+    return v.map((_, i) => { if (mid[i] == null) return null;
+      const w = v.slice(i-n+1, i+1); const sd = Math.sqrt(w.reduce((a,x) => a + (x-mid[i])**2, 0)/n);
+      return {lo: mid[i]-k*sd, hi: mid[i]+k*sd}; });
+  }
+  function crossings(s20, s50, from){
+    const out = [];
+    for (let i = Math.max(from,1); i < s20.length; i++){
+      if (s20[i-1] == null || s50[i-1] == null) continue;
+      if (s20[i-1] <= s50[i-1] && s20[i] > s50[i]) out.push({i, type:'buy'});
+      else if (s20[i-1] >= s50[i-1] && s20[i] < s50[i]) out.push({i, type:'sell'});
+    }
+    return out;
+  }
+
+  function startIndex(series, days){
+    const s = new Date(); s.setDate(s.getDate() - days); const k = iso(s);
+    const i = series.findIndex(p => p.date >= k); return i < 0 ? 0 : i;
+  }
+
+  function baseOpts(extra = {}){
+    const muted = css('--muted'), line = css('--line');
+    return {
+      responsive:true, maintainAspectRatio:false, animation:{duration:250},
+      interaction:{mode:'index', intersect:false},
+      plugins:{legend:{display:false}, tooltip:{displayColors:true}},
+      scales:{
+        x:{ticks:{color:muted, maxTicksLimit:5, maxRotation:0, autoSkip:true}, grid:{display:false}},
+        y:{ticks:{color:muted, maxTicksLimit:5}, grid:{color:line}, ...(extra.y || {})}
+      }
+    };
+  }
+  const ds = (label, data, color, w = 2, dash) => ({label, data, borderColor:color, backgroundColor:color, borderWidth:w, pointRadius:0, tension:.15, spanGaps:true, borderDash:dash});
+
+  function draw(id, config){
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart($(id), config);
+  }
+
+  function renderQuick(){
+    const q = $('quick'); q.innerHTML = '';
+    QUICK.forEach(code => {
+      const r = state.table.rates.find(x => x.code === code); if (!r) return;
+      const b = document.createElement('button');
+      b.className = 'chip'; b.setAttribute('aria-pressed', code === state.code);
+      b.innerHTML = `<b>${code}</b><span>${fmt(r.mid, digits(r.mid))}</span>`;
+      b.onclick = () => select(code);
+      q.appendChild(b);
+    });
+  }
+
+  function renderSelects(){
+    const opts = state.table.rates.map(r => `<option value="${r.code}">${r.code} (${r.currency})</option>`).join('');
+    $('cur').innerHTML = opts; $('cur').value = state.code;
+    $('cmp').innerHTML = '<option value="">Bez porównania</option>' + opts; $('cmp').value = state.cmp;
+  }
+
+  function renderHero(){
+    const r = state.table.rates.find(x => x.code === state.code);
+    const p = state.prev.rates.find(x => x.code === state.code);
+    $('rate').innerHTML = `${fmt(r.mid, digits(r.mid))}<small>zł</small>`;
+    const ch = (r.mid / p.mid - 1) * 100;
+    const el = $('delta'); el.textContent = `${pct(ch)} od poprzedniej tabeli`;
+    el.className = 'delta ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : '');
+    $('date').textContent = `kurs z ${plDate(state.table.effectiveDate)}`;
+    document.title = `${state.code} ${fmt(r.mid, digits(r.mid))} zł`;
+  }
+
+  async function renderAnalysis(){
+    $('content').classList.add('loading');
+    const series = await loadSeries(state.code, state.days);
+    const v = series.map(p => p.mid);
+    const s20 = sma(v, 20), s50 = sma(v, 50), r14 = rsi(v);
+    const i0 = startIndex(series, state.days);
+    const view = series.slice(i0), vals = v.slice(i0), labels = view.map(p => plDate(p.date));
+    const d = digits(vals[vals.length-1]);
+
+    const sets = [ds(state.code + '/PLN', vals, css('--accent'), 2.2)];
+    if (state.sma20) sets.push(ds('Średnia 20', s20.slice(i0), css('--sma1'), 1.5));
+    if (state.sma50) sets.push(ds('Średnia 50', s50.slice(i0), css('--sma2'), 1.5));
+    const cx = crossings(s20, s50, i0);
+    const mk = type => { const a = Array(vals.length).fill(null); cx.filter(c => c.type === type).forEach(c => a[c.i - i0] = v[c.i]); return a; };
+    const marker = (label, data, color, rot) => ({label, data, showLine:false, pointStyle:'triangle', pointRadius:7, pointHoverRadius:8, rotation:rot, borderColor:color, backgroundColor:color});
+    sets.push(marker('Sygnał kupna', mk('buy'), css('--up'), 0), marker('Sygnał sprzedaży', mk('sell'), css('--down'), 180));
+    const po = baseOpts(); po.plugins.tooltip.filter = c => c.parsed.y != null; po.plugins.tooltip.callbacks = {label: c => `${c.dataset.label}: ${fmt(c.parsed.y, d)}`};
+    draw('priceChart', {type:'line', data:{labels, datasets:sets}, options:po});
+
+    const rv = r14.slice(i0);
+    draw('rsiChart', {type:'line', data:{labels, datasets:[
+      ds('RSI', rv, css('--accent'), 1.8),
+      ds('70', rv.map(() => 70), css('--down'), 1, [4,4]),
+      ds('30', rv.map(() => 30), css('--up'), 1, [4,4])
+    ]}, options:baseOpts({y:{min:0, max:100, ticks:{color:css('--muted'), stepSize:30}}})});
+
+    // Statystyki
+    const first = vals[0], last = vals[vals.length-1];
+    let mi = 0, ma = 0; vals.forEach((x,i) => { if (x < vals[mi]) mi = i; if (x > vals[ma]) ma = i; });
+    const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+    const rets = vals.slice(1).map((x,i) => Math.log(x / vals[i]));
+    const rm = rets.reduce((a,b) => a+b, 0) / (rets.length || 1);
+    const vol = Math.sqrt(rets.reduce((a,b) => a + (b-rm)**2, 0) / Math.max(rets.length-1, 1)) * Math.sqrt(252) * 100;
+    const ch = (last/first - 1) * 100;
+    const lastRsi = rv[rv.length-1];
+    const stat = (t, val, sub = '', cls = '') => `<div class="stat"><dt>${t}</dt><dd class="num ${cls}">${val}<small>${sub}</small></dd></div>`;
+    $('stats').innerHTML =
+      stat('Zmiana w okresie', pct(ch), `od ${fmt(first, d)} zł`, ch > 0 ? 'up' : ch < 0 ? 'down' : '') +
+      stat('Średni kurs', fmt(mean, d), `${vals.length} notowań`) +
+      stat('Minimum', fmt(vals[mi], d), plDate(view[mi].date)) +
+      stat('Maksimum', fmt(vals[ma], d), plDate(view[ma].date)) +
+      stat('Zmienność roczna', fmt(vol, 1) + '%', 'odchylenie dziennych zmian') +
+      stat('RSI teraz', fmt(lastRsi, 0), lastRsi > 70 ? 'wykupienie' : lastRsi < 30 ? 'wyprzedanie' : 'strefa neutralna');
+
+    const a20 = s20[s20.length-1], a50 = s50[s50.length-1];
+    const parts = [];
+    if (a50) parts.push(last > a50 ? `Kurs jest powyżej średniej 50-dniowej (${fmt(a50, d)}), co wskazuje na trend wzrostowy.` : `Kurs jest poniżej średniej 50-dniowej (${fmt(a50, d)}), co wskazuje na trend spadkowy.`);
+    if (a20 && a50) parts.push(a20 > a50 ? 'Średnia 20-dniowa jest nad 50-dniową.' : 'Średnia 20-dniowa jest pod 50-dniową.');
+    $('signal').textContent = parts.join(' ');
+
+    renderSignals(series, v, i0, s20, s50, r14, d, cx);
+    await renderCompare(view, vals, labels);
+    $('content').classList.remove('loading');
+  }
+
+  function renderSignals(series, v, i0, s20, s50, r14, d, cx){
+    const L = v.length - 1, last = v[L];
+    const {h} = macd(v), bb = bollinger(v)[L];
+    const f = [];
+    if (s50[L] != null) f.push(s20[L] > s50[L]
+      ? [1, 'Trend wzrostowy: średnia 20-dniowa jest nad 50-dniową.']
+      : [-1, 'Trend spadkowy: średnia 20-dniowa jest pod 50-dniową.']);
+    const turned = h[L] > 0 && h[L-3] <= 0 ? ' (świeże przecięcie)' : h[L] < 0 && h[L-3] >= 0 ? ' (świeże przecięcie)' : '';
+    f.push(h[L] > 0 ? [1, 'MACD nad linią sygnału, rośnie siła wzrostów' + turned + '.'] : [-1, 'MACD pod linią sygnału, przeważa presja spadkowa' + turned + '.']);
+    const r = r14[L];
+    f.push(r < 30 ? [1, `RSI ${fmt(r,0)}: waluta wyprzedana, często następuje odbicie w górę.`]
+      : r > 70 ? [-1, `RSI ${fmt(r,0)}: waluta wykupiona, rośnie ryzyko spadku.`]
+      : [0, `RSI ${fmt(r,0)}: strefa neutralna.`]);
+    if (bb) f.push(last < bb.lo ? [1, `Kurs pod dolną wstęgą Bollingera (${fmt(bb.lo,d)}), jest nietypowo tani.`]
+      : last > bb.hi ? [-1, `Kurs nad górną wstęgą Bollingera (${fmt(bb.hi,d)}), jest nietypowo drogi.`]
+      : [0, `Kurs mieści się we wstęgach Bollingera (${fmt(bb.lo,d)}–${fmt(bb.hi,d)}).`]);
+
+    const score = f.reduce((a,x) => a + x[0], 0);
+    const verdicts = score >= 3 ? ['Dobry moment na zakup', 'Większość wskaźników sprzyja kupnu ' + state.code + '.']
+      : score >= 1 ? ['Raczej kupuj', 'Przewaga sygnałów kupna, ale nie wszystkie wskaźniki się zgadzają.']
+      : score <= -3 ? ['Dobry moment na sprzedaż', 'Większość wskaźników wskazuje na spadki ' + state.code + '.']
+      : score <= -1 ? ['Raczej sprzedaj lub czekaj z zakupem', 'Przewaga sygnałów spadkowych.']
+      : ['Czekaj', 'Sygnały są mieszane, brak wyraźnej przewagi.'];
+    $('gauge').textContent = (score > 0 ? '+' : '') + score;
+    $('gauge').className = 'gauge num ' + (score > 0 ? 'up' : score < 0 ? 'down' : '');
+    $('vTitle').textContent = verdicts[0];
+    const lastX = [...cx].reverse()[0];
+    $('vSub').textContent = verdicts[1] + (lastX ? ` Ostatni sygnał przecięcia średnich: ${lastX.type === 'buy' ? 'kupno' : 'sprzedaż'} ${plDate(series[lastX.i].date)} po ${fmt(v[lastX.i], d)} zł.` : '');
+    $('factors').innerHTML = f.map(([sc, t]) => `<li><b class="${sc > 0 ? 'up' : sc < 0 ? 'down' : ''}">${sc > 0 ? '+1' : sc < 0 ? '−1' : '0'}</b><span>${t}</span></li>`).join('');
+
+    // Test historyczny strategii przecięcia średnich
+    const sp = state.spread / 100;
+    let cash = 1, entry = null; const trades = [];
+    cx.forEach(c => {
+      if (c.type === 'buy' && entry == null) entry = c.i;
+      else if (c.type === 'sell' && entry != null){
+        const g = (v[c.i]*(1-sp/2)) / (v[entry]*(1+sp/2));
+        cash *= g; trades.push({a:entry, b:c.i, g}); entry = null;
+      }
+    });
+    let open = null;
+    if (entry != null){ open = (last*(1-sp/2)) / (v[entry]*(1+sp/2)); cash *= open; }
+    const hold = (last*(1-sp/2)) / (v[i0]*(1+sp/2));
+    const wins = trades.filter(t => t.g > 1).length;
+    const cls = x => x > 1 ? 'up' : x < 1 ? 'down' : '';
+    const pr = x => pct((x-1)*100);
+    $('bt').innerHTML =
+      `<div><dt>Wynik strategii</dt><dd class="num ${cls(cash)}">${pr(cash)}</dd></div>` +
+      `<div><dt>Kup i trzymaj</dt><dd class="num ${cls(hold)}">${pr(hold)}</dd></div>` +
+      `<div><dt>Zamknięte transakcje</dt><dd class="num">${trades.length}</dd></div>` +
+      `<div><dt>Zyskowne</dt><dd class="num">${trades.length ? Math.round(wins/trades.length*100) + '%' : '–'}</dd></div>`;
+    const rows = trades.slice(-5).reverse().map(t => `<li>Kupno ${plDate(series[t.a].date)} po ${fmt(v[t.a],d)}, sprzedaż ${plDate(series[t.b].date)} po ${fmt(v[t.b],d)}: <span class="${cls(t.g)}">${pr(t.g)}</span></li>`);
+    if (open != null) rows.unshift(`<li>Otwarta pozycja od ${plDate(series[entry].date)} po ${fmt(v[entry],d)}: <span class="${cls(open)}">${pr(open)}</span> na dziś</li>`);
+    $('trades').innerHTML = rows.length ? rows.join('') : '<li style="list-style:none;margin-left:-18px;color:var(--muted)">Brak sygnałów w tym okresie. Wybierz dłuższy okres, np. 2R.</li>';
+  }
+
+  async function renderCompare(view, vals, labels){
+    const base = vals.map(x => (x / vals[0] - 1) * 100);
+    const sets = [ds(state.code, base, css('--accent'), 2)];
+    if (state.cmp && state.cmp !== state.code){
+      const other = await loadSeries(state.cmp, state.days);
+      const m = new Map(other.map(p => [p.date, p.mid]));
+      const ov = view.map(p => m.get(p.date) ?? null);
+      const o0 = ov.find(x => x != null);
+      sets.push(ds(state.cmp, ov.map(x => x == null ? null : (x / o0 - 1) * 100), css('--cmp'), 2));
+    }
+    const o = baseOpts({y:{ticks:{color:css('--muted'), maxTicksLimit:5, callback: v => v + '%'}}});
+    o.plugins.legend = {display:true, labels:{color:css('--ink'), boxWidth:14, boxHeight:3}};
+    o.plugins.tooltip.callbacks = {label: c => `${c.dataset.label}: ${pct(c.parsed.y)}`};
+    draw('cmpChart', {type:'line', data:{labels, datasets:sets}, options:o});
+  }
+
+  async function renderLive(){
+    const box = $('live'); const code = state.code;
+    clearTimeout(wtTimer); wtSpread = null; $('useWt').hidden = true;
+    if (!WT_CODES.includes(code)){ box.hidden = true; return; }
+    const link = `<a href="https://www.walutomat.pl/" target="_blank" rel="noopener">Otwórz Walutomat</a>`;
+    try {
+      const r = await fetch((WT_PROXY || WT_API) + code + 'PLN', {headers:{Accept:'application/json'}});
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json(); if (!j.success || !j.result) throw new Error('brak danych');
+      if (code !== state.code) return;
+      const ask = parseFloat(j.result.asks[0].price), bid = parseFloat(j.result.bids[0].price);
+      const mid = (ask + bid) / 2; wtSpread = (ask - bid) / mid * 100;
+      const nbp = state.table.rates.find(x => x.code === code).mid;
+      const d = digits(mid);
+      box.innerHTML = `<div class="row">
+        <div><div class="lbl">Kupisz ${code} po</div><div class="q num">${fmt(ask, d)}</div></div>
+        <div><div class="lbl">Sprzedasz ${code} po</div><div class="q num">${fmt(bid, d)}</div></div>
+        <div><div class="lbl">Spread</div><div class="q num">${fmt(wtSpread, 2)}%</div></div></div>
+        <div class="muted">Walutomat na żywo, ${new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}. Środek rynku ${pct((mid/nbp-1)*100)} względem kursu NBP. ${link}</div>`;
+      box.hidden = false; $('useWt').hidden = false;
+      $('useWt').textContent = `Wstaw spread z Walutomatu (${fmt(wtSpread,2)}%)`;
+    } catch (e) {
+      console.warn('Walutomat:', e);
+      box.innerHTML = `<div class="muted" style="margin:0">Nie udało się pobrać kursu z Walutomatu (przeglądarka mogła zablokować połączenie). ${link}</div>`;
+      box.hidden = false;
+    }
+    if (!document.hidden) wtTimer = setTimeout(renderLive, 60000);
+  }
+
+  function showError(err){
+    console.error(err);
+    $('error').innerHTML = `<div class="msg"><b>Nie udało się pobrać kursów z NBP.</b><br>Sprawdź połączenie z internetem. Jeśli NBP nie opublikował jeszcze dzisiejszej tabeli, spróbuj ponownie za chwilę.<br><button id="retry">Spróbuj ponownie</button></div>`;
+    $('retry').onclick = () => { $('error').innerHTML = ''; start(); };
+    $('content').classList.remove('loading');
+  }
+
+  async function select(code){
+    state.code = code; save();
+    renderQuick(); $('cur').value = code; renderHero(); renderLive();
+    try { await renderAnalysis(); } catch (e) { showError(e); }
+  }
+
+  function syncRange(){
+    [...$('range').children].forEach(b => b.setAttribute('aria-pressed', +b.dataset.d === state.days));
+  }
+
+  async function start(){
+    try {
+      await loadTables();
+      renderSelects(); renderQuick(); renderHero(); syncRange(); renderLive();
+      await renderAnalysis();
+    } catch (e) { showError(e); }
+  }
+
+  $('cur').onchange = e => select(e.target.value);
+  $('cmp').onchange = async e => { state.cmp = e.target.value; save(); try { await renderAnalysis(); } catch (er) { showError(er); } };
+  $('range').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.days = +b.dataset.d; save(); syncRange();
+    try { await renderAnalysis(); } catch (er) { showError(er); }
+  };
+  $('spread').value = state.spread;
+  $('spread').onchange = e => { const x = parseFloat(String(e.target.value).replace(',', '.')); state.spread = isNaN(x) ? 0 : Math.min(Math.max(x,0),10); e.target.value = state.spread; save(); renderAnalysis().catch(showError); };
+  $('useWt').onclick = e => { e.preventDefault(); if (wtSpread == null) return; $('spread').value = Math.round(wtSpread*100)/100; $('spread').onchange({target:$('spread')}); };
+  $('tSma20').checked = state.sma20; $('tSma50').checked = state.sma50;
+  $('tSma20').onchange = e => { state.sma20 = e.target.checked; save(); renderAnalysis().catch(showError); };
+  $('tSma50').onchange = e => { state.sma50 = e.target.checked; save(); renderAnalysis().catch(showError); };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => state.table && renderAnalysis().catch(showError));
+  let loadedAt = Date.now();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && state.table && Date.now() - loadedAt > 30*60*1000) { loadedAt = Date.now(); cache.clear(); start(); } });
+
+  start();
+})();
+</script>
+</body>
+</html>
